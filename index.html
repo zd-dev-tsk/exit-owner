@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exit Owner — model your dilution from SAFEs to exit. What will you actually take home?</title>
+<meta name="description" content="Free founder dilution simulator. Stack SAFEs, priced rounds, option pool top-ups and 1x liquidation preferences — see exactly what each founder takes home at exit. No signup, runs in your browser.">
+<meta property="og:title" content="Exit Owner — what will you actually own at exit?">
+<meta property="og:description" content="Stack SAFEs, priced rounds, option pools and liquidation preferences. See every founder's real take-home at exit. Free, no signup.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://exitowner.dev/">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"How does a post-money SAFE dilute founders?","acceptedAnswer":{"@type":"Answer","text":"A post-money SAFE fixes the investor's ownership at investment ÷ post-money cap, measured after all SAFEs convert but before new round money. Stacked post-money SAFEs are additive: three $500k SAFEs at a $5M cap each take 10% — 30% combined — entirely from existing holders."}},
+{"@type":"Question","name":"Why do option pool top-ups dilute founders more than investors?","acceptedAnswer":{"@type":"Answer","text":"Pool increases are typically created 'pre-money': the new pool is carved out of the cap table before the new investors buy in, so existing holders absorb all of that dilution while the new investors' percentage is unaffected."}},
+{"@type":"Question","name":"What is a 1x non-participating liquidation preference?","acceptedAnswer":{"@type":"Answer","text":"At exit, each investor chooses the greater of (a) getting their money back (1x) or (b) converting to common and taking their pro-rata share. In low exits, preferences can consume most of the proceeds before founders see anything."}}]}
+</script>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#12161f; --panel2:#171c27; --line:#232a38;
+  --text:#e8ecf4; --muted:#8b94a7; --accent:#5eead4; --accent2:#818cf8;
+  --warn:#fbbf24; --danger:#f87171; --good:#34d399;
+  --f1:#5eead4; --f2:#818cf8; --f3:#f472b6; --f4:#fb923c;
+  --pool:#64748b; --inv1:#fbbf24; --inv2:#f87171; --inv3:#a78bfa; --inv4:#38bdf8; --inv5:#facc15; --inv6:#fb7185;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,'Segoe UI',Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+header{padding:42px 0 10px}
+h1{font-size:34px;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);margin-top:10px;max-width:640px;font-size:16px}
+.grid{display:grid;grid-template-columns:430px 1fr;gap:22px;margin:28px 0 50px}
+@media(max-width:960px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:14px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+input,select,button{font:inherit;color:var(--text)}
+input,select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none;width:100%}
+input:focus,select:focus{border-color:var(--accent2)}
+input[type=number]{appearance:textfield}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}
+.field{flex:1;min-width:90px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13.5px;transition:.15s}
+.btn:hover{border-color:var(--accent2);color:#fff}
+.btn.primary{background:linear-gradient(90deg,#134e4a,#1e1b4b);border-color:var(--accent);color:#d9fff7}
+.btn.x{padding:4px 9px;border-radius:6px;color:var(--muted);font-size:12px}
+.btn.x:hover{color:var(--danger);border-color:var(--danger)}
+.ev{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent2);border-radius:10px;padding:12px;margin-bottom:10px}
+.ev.safe{border-left-color:var(--accent)}
+.ev-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.addbar{display:flex;gap:8px;margin-top:6px}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.stat .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+.stat.hl{border-color:var(--accent);background:linear-gradient(180deg,rgba(94,234,212,.07),transparent)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{color:var(--muted);text-align:left;font-weight:500;padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+td{padding:8px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:1px}
+.pref{font-size:10.5px;color:var(--warn);border:1px solid rgba(251,191,36,.4);border-radius:99px;padding:1px 7px;margin-left:6px}
+.warnbox{border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.07);color:#fde68a;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.muted{color:var(--muted)}
+.assume{font-size:13.5px;color:var(--muted)}
+.assume li{margin:7px 0 7px 18px}
+.faq h3{font-size:15px;margin:16px 0 4px}
+.faq p{color:var(--muted);font-size:14px}
+footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--muted);font-size:13.5px}
+.cta{background:linear-gradient(135deg,#134e4a 0%,#1e1b4b 100%);border:1px solid var(--accent);border-radius:14px;padding:22px;margin:34px 0}
+.cta h2{font-size:20px;margin-bottom:6px}
+.cta p{color:#c7d2fe;font-size:14px;max-width:560px}
+.cta .btn{margin-top:14px;background:var(--accent);color:#042f2e;font-weight:600;border:none}
+svg text{font-family:inherit}
+.share-ok{color:var(--good);font-size:13px;margin-left:8px}
+.sec{margin-top:22px}
+h2.big{font-size:22px;letter-spacing:-.01em;margin-bottom:6px;color:var(--text);text-transform:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>What will you <em>actually own</em> at exit?</h1>
+  <p class="sub">Most calculators model one SAFE in one round. Real life is stacked SAFEs, pool top-ups, three rounds and liquidation preferences. <strong>Exit Owner</strong> models the whole journey — free, no signup, nothing leaves your browser.</p>
+</header>
+
+<div class="grid">
+  <div><!-- ============ INPUTS ============ -->
+    <div class="card">
+      <h2>Founding team</h2>
+      <div id="founders"></div>
+      <div class="row">
+        <div class="field"><label>Early option pool % (at founding)</label><input type="number" id="earlyPool" min="0" max="50" step="1"></div>
+        <button class="btn" onclick="addFounder()">+ founder</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>Fundraising timeline <span class="muted" style="text-transform:none;letter-spacing:0">(in order)</span></h2>
+      <div id="events"></div>
+      <div class="addbar">
+        <button class="btn" onclick="addSafe()">+ SAFE</button>
+        <button class="btn" onclick="addPriced()">+ Priced round</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>Exit</h2>
+      <div class="row">
+        <div class="field"><label>Exit / acquisition value ($M)</label><input type="number" id="exitVal" min="0" step="5"></div>
+        <div class="field"><label>1x liquidation preferences</label>
+          <select id="prefs"><option value="1">On (realistic)</option><option value="0">Off (everyone pro-rata)</option></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn primary" onclick="shareLink()">Copy scenario link</button><span id="shareOk" class="share-ok"></span>
+      </div>
+    </div>
+  </div>
+
+  <div><!-- ============ RESULTS ============ -->
+    <div id="warnings"></div>
+    <div class="hero" id="hero"></div>
+    <div class="card"><h2>Ownership through every round</h2><div id="chart"></div><div id="legend" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div></div>
+    <div class="card sec"><h2>Exit waterfall — who gets what</h2><table id="waterfall"></table></div>
+    <div class="card sec"><h2>Final cap table</h2><table id="captable"></table></div>
+  </div>
+</div>
+
+<div class="cta">
+  <h2>Negotiating a real round? Don't do it on a web toy.</h2>
+  <p>The <strong>Founder's Fundraising Scenario Model</strong> is the full Excel workbook behind this tool: side-by-side scenario comparison, pre/post-money SAFE mechanics, secondary sales, founder vesting, and a term-sheet red-flag checklist. Built once, yours forever.</p>
+  <a id="gumroad" href="#" rel="noopener"><button class="btn">Get the workbook — $39</button></a>
+</div>
+
+<div class="card sec">
+  <h2 class="big">The model, transparently</h2>
+  <ul class="assume">
+    <li><strong>Post-money SAFE:</strong> ownership = amount ÷ post-money cap, fixed after all SAFEs convert and before new round money (YC semantics — stacked SAFE percentages are additive and dilute only existing holders).</li>
+    <li><strong>Pre-money SAFE:</strong> cap-based ownership ≈ amount ÷ (cap + all converting SAFE amounts).</li>
+    <li><strong>Discount:</strong> ownership = amount ÷ ((1 − discount) × round pre-money); the SAFE converts at whichever basis gives more ownership.</li>
+    <li><strong>Priced round:</strong> new investors get amount ÷ (pre-money + amount). Pre-money is inclusive of converted SAFEs and the expanded pool (the standard, founder-unfriendly convention).</li>
+    <li><strong>Pool top-up:</strong> raised to the target % of post-round fully-diluted, carved out pre-money — existing holders absorb it, new investors don't.</li>
+    <li><strong>Exit:</strong> every investor holds a 1x non-participating preference and takes the greater of their money back or pro-rata, solved iteratively.</li>
+  </ul>
+  <p class="assume" style="margin-top:10px">This is an educational model, not legal or financial advice. Real documents control; have a lawyer read yours.</p>
+</div>
+
+<div class="card sec faq">
+  <h2 class="big">FAQ</h2>
+  <h3>How much do stacked SAFEs dilute founders?</h3>
+  <p>Post-money SAFEs are additive: three $500k SAFEs at a $5M cap each take 10% — 30% combined — all out of the founders' side of the table. This is the single most common surprise at the first priced round.</p>
+  <h3>Why did my ownership drop more than the round size?</h3>
+  <p>Option pool top-ups are usually created pre-money, so founders absorb both the new investors' stake <em>and</em> the entire pool increase.</p>
+  <h3>Why do I get less than my percentage at exit?</h3>
+  <p>1x non-participating preferences mean investors take their money back first in low exits. A founder with 40% of a company sold for less than total capital raised can walk away with very little.</p>
+</div>
+
+<footer><div>Built as a free, open tool. Everything runs client-side — your numbers never leave this page.</div></footer>
+</div>
+
+<script>
+/* ===================== ENGINE (tested) ===================== */
+/* ============================================================
+   Exit Owner — cap table simulation engine
+   Percentage-method model. Assumptions (documented in UI):
+   1. Post-money SAFE: holder's ownership at conversion = amount / cap,
+      measured on the cap table AFTER all SAFEs convert but BEFORE the
+      new round's money and option-pool increase (YC post-money SAFE
+      semantics: SAFE percentages are additive and dilute existing
+      holders only).
+   2. Pre-money SAFE: cap-based ownership = amount / (cap + total SAFE
+      amounts converting), an approximation of share-count mechanics.
+   3. Discount: discount-based ownership = amount / ((1 - d) * preMoney).
+      The SAFE converts at whichever basis gives MORE ownership.
+   4. Priced round: new investors own amount / (preMoney + amount) of
+      the post-round company. Pre-money valuation is inclusive of
+      converted SAFEs and the expanded option pool (standard term).
+   5. Option pool top-up: raised to target % of POST-round fully
+      diluted, created pre-money (dilutes existing holders + SAFEs,
+      not the new investors). Never shrinks below its current size.
+   6. Exit: every investor (priced + converted SAFEs) holds 1x
+      non-participating preference = invested amount (toggleable).
+      Each chooses max(preference, as-converted). Solved iteratively.
+   ============================================================ */
+
+function simulate(scenario) {
+  // scenario: { founders:[{name, pct}], earlyPoolPct, events:[...], exitValue, prefsEnabled }
+  // event: {type:'safe', name, amount, cap, capType:'post'|'pre', discount}
+  //        {type:'priced', name, amount, preMoney, poolPct}
+  const stages = [];
+  // holders: id -> {label, kind:'founder'|'pool'|'investor', pct, invested}
+  let holders = [];
+  const totalFounderPct = scenario.founders.reduce((s, f) => s + f.pct, 0);
+  const earlyPool = scenario.earlyPoolPct || 0;
+  const founderScale = (100 - earlyPool) / (totalFounderPct || 1);
+  scenario.founders.forEach((f, i) => {
+    holders.push({ id: 'F' + i, label: f.name || 'Founder ' + (i + 1), kind: 'founder', pct: f.pct * founderScale / 100, invested: 0 });
+  });
+  if (earlyPool > 0) holders.push({ id: 'POOL', label: 'Option pool', kind: 'pool', pct: earlyPool / 100, invested: 0 });
+  else holders.push({ id: 'POOL', label: 'Option pool', kind: 'pool', pct: 0, invested: 0 });
+
+  stages.push(snap('Founding', holders, null));
+
+  let pendingSafes = [];
+  const warnings = [];
+
+  for (const ev of scenario.events) {
+    if (ev.type === 'safe') {
+      pendingSafes.push(ev);
+      stages.push(snap(ev.name || 'SAFE', holders, { note: 'SAFE signed — converts at next priced round', pending: pendingSafes.slice() }));
+    } else if (ev.type === 'priced') {
+      // 1. Convert pending SAFEs (percentage method)
+      const totalSafeAmt = pendingSafes.reduce((s, x) => s + x.amount, 0);
+      const safePcts = pendingSafes.map(s => {
+        let capPct = 0;
+        if (s.cap > 0) {
+          capPct = s.capType === 'pre'
+            ? s.amount / (s.cap + totalSafeAmt)
+            : s.amount / s.cap; // post-money cap
+        }
+        let discPct = 0;
+        if (s.discount > 0 && ev.preMoney > 0) {
+          discPct = s.amount / ((1 - s.discount / 100) * ev.preMoney);
+        }
+        let pct = Math.max(capPct, discPct);
+        if (pct === 0) pct = s.amount / (ev.preMoney + 0.0000001); // uncapped, no discount: converts at round price
+        return Math.min(pct, 0.95);
+      });
+      const safeTotal = safePcts.reduce((a, b) => a + b, 0);
+      if (safeTotal > 0.6) warnings.push(`SAFEs converting at "${ev.name}" claim ${(safeTotal * 100).toFixed(1)}% — likely a down-round / cram-down situation.`);
+      // existing holders diluted pro-rata by SAFE conversion
+      holders.forEach(h => { h.pct *= (1 - safeTotal); });
+      pendingSafes.forEach((s, i) => {
+        holders.push({ id: 'S' + holders.length, label: s.name || 'SAFE investor', kind: 'investor', pct: safePcts[i], invested: s.amount });
+      });
+      pendingSafes = [];
+
+      // 2. New investor %
+      const invPct = ev.amount / (ev.preMoney + ev.amount);
+      // 3. Pool top-up to target % of post (pre-money shuffle)
+      const pool = holders.find(h => h.id === 'POOL');
+      const targetPool = (ev.poolPct || 0) / 100;
+      // pool's % after this round if untouched: current * (1 - invPct)
+      const poolAfterIfUntouched = pool.pct * (1 - invPct);
+      let poolFinal = Math.max(targetPool, poolAfterIfUntouched);
+      // non-pool existing holders share: 1 - invPct - poolFinal, scaled pro-rata
+      const nonPoolPre = holders.filter(h => h.id !== 'POOL').reduce((s, h) => s + h.pct, 0);
+      const residual = 1 - invPct - poolFinal;
+      if (residual < 0) warnings.push(`Round "${ev.name}": investor stake + pool exceed 100%. Check inputs.`);
+      holders.forEach(h => {
+        if (h.id === 'POOL') h.pct = poolFinal;
+        else h.pct = nonPoolPre > 0 ? h.pct / nonPoolPre * Math.max(residual, 0) : 0;
+      });
+      holders.push({ id: 'R' + holders.length, label: ev.name || 'Investors', kind: 'investor', pct: invPct, invested: ev.amount });
+      stages.push(snap(ev.name || 'Priced round', holders, {
+        postMoney: ev.preMoney + ev.amount,
+        safeConverted: safeTotal,
+      }));
+    }
+  }
+
+  if (pendingSafes.length) {
+    warnings.push(`${pendingSafes.length} SAFE(s) never converted — add a priced round after them to see their dilution.`);
+  }
+
+  // Exit waterfall
+  const exit = waterfall(holders, scenario.exitValue, scenario.prefsEnabled !== false);
+  return { stages, holders, exit, warnings };
+}
+
+function waterfall(holders, exitValue, prefsEnabled) {
+  const rows = holders.filter(h => h.pct > 1e-12 || h.invested > 0).map(h => ({
+    label: h.label, kind: h.kind, pct: h.pct, invested: h.invested, payout: 0, tookPref: false,
+  }));
+  if (!exitValue || exitValue <= 0) return { rows, exitValue: 0 };
+  if (!prefsEnabled) {
+    rows.forEach(r => { r.payout = r.pct * exitValue; });
+    return { rows, exitValue };
+  }
+  // iterate: investors take max(1x preference, pro-rata as-converted)
+  let changed = true; let guard = 0;
+  while (changed && guard++ < 50) {
+    changed = false;
+    const prefTotal = rows.filter(r => r.tookPref).reduce((s, r) => s + r.invested, 0);
+    const remaining = Math.max(exitValue - prefTotal, 0);
+    const convPct = rows.filter(r => !r.tookPref).reduce((s, r) => s + r.pct, 0);
+    for (const r of rows) {
+      if (r.kind !== 'investor' || r.invested <= 0) continue;
+      const asConverted = convPct > 0 ? (r.tookPref ? 0 : r.pct / convPct * remaining)
+        : 0;
+      // evaluate flipping decision
+      if (!r.tookPref) {
+        // would they rather take pref? compare current as-converted vs pref
+        if (r.invested > asConverted + 1e-9) { r.tookPref = true; changed = true; }
+      } else {
+        // would converting beat pref? simulate them back in
+        const remainingIf = Math.max(exitValue - (prefTotal - r.invested), 0);
+        const convPctIf = convPct + r.pct;
+        const asConvIf = convPctIf > 0 ? r.pct / convPctIf * remainingIf : 0;
+        if (asConvIf > r.invested + 1e-9) { r.tookPref = false; changed = true; }
+      }
+    }
+  }
+  const prefTotal = rows.filter(r => r.tookPref).reduce((s, r) => s + r.invested, 0);
+  const prefPaid = Math.min(prefTotal, exitValue);
+  const remaining = Math.max(exitValue - prefTotal, 0);
+  const convPct = rows.filter(r => !r.tookPref).reduce((s, r) => s + r.pct, 0);
+  rows.forEach(r => {
+    if (r.tookPref) r.payout = prefTotal > 0 ? r.invested / prefTotal * prefPaid : 0;
+    else r.payout = convPct > 0 ? r.pct / convPct * remaining : 0;
+  });
+  return { rows, exitValue };
+}
+
+function snap(name, holders, meta) {
+  return { name, meta, holders: holders.map(h => ({ id: h.id, label: h.label, kind: h.kind, pct: h.pct })) };
+}
+
+
+
+/* ===================== STATE ===================== */
+const DEFAULT = {
+  founders:[{name:'You',pct:55},{name:'Co-founder',pct:45}],
+  earlyPoolPct:10,
+  events:[
+    {type:'safe',name:'Pre-seed SAFE',amount:750000,cap:8000000,capType:'post',discount:0},
+    {type:'priced',name:'Seed',amount:3000000,preMoney:12000000,poolPct:10},
+    {type:'priced',name:'Series A',amount:12000000,preMoney:40000000,poolPct:12},
+  ],
+  exitValue:100000000, prefsEnabled:true,
+};
+let S = loadState() || JSON.parse(JSON.stringify(DEFAULT));
+
+function loadState(){
+  try{ if(location.hash.length>2) return JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(1))))); }catch(e){}
+  return null;
+}
+function shareLink(){
+  const h = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  history.replaceState(null,'','#'+h);
+  navigator.clipboard.writeText(location.href).then(()=>{
+    const el=document.getElementById('shareOk'); el.textContent='Link copied ✓'; setTimeout(()=>el.textContent='',2500);
+  });
+}
+/* ===================== RENDER INPUTS ===================== */
+const $=id=>document.getElementById(id);
+const fmt$=v=>{
+  if(v>=1e9) return '$'+(v/1e9).toFixed(v%1e9?2:0)+'B';
+  if(v>=1e6) return '$'+(v/1e6).toFixed(v%1e6?1:0)+'M';
+  if(v>=1e3) return '$'+(v/1e3).toFixed(0)+'k';
+  return '$'+Math.round(v);
+};
+const fmtP=v=>(v*100).toFixed(v*100<10?1:1)+'%';
+
+function renderFounders(){
+  $('founders').innerHTML = S.founders.map((f,i)=>`
+    <div class="row">
+      <div class="field" style="flex:2"><label>Name</label><input value="${esc(f.name)}" onchange="S.founders[${i}].name=this.value;update()"></div>
+      <div class="field"><label>Split %</label><input type="number" min="0" max="100" value="${f.pct}" onchange="S.founders[${i}].pct=+this.value;update()"></div>
+      ${S.founders.length>1?`<button class="btn x" style="margin-top:16px" onclick="S.founders.splice(${i},1);renderAll()">✕</button>`:''}
+    </div>`).join('');
+  $('earlyPool').value = S.earlyPoolPct;
+}
+function renderEvents(){
+  $('events').innerHTML = S.events.map((e,i)=>{
+    const up = i>0?`<button class="btn x" title="move up" onclick="swapEv(${i},${i-1})">↑</button>`:'';
+    const dn = i<S.events.length-1?`<button class="btn x" title="move down" onclick="swapEv(${i},${i+1})">↓</button>`:'';
+    if(e.type==='safe') return `
+    <div class="ev safe">
+      <div class="ev-head"><span class="tag" style="color:var(--accent);border-color:var(--accent)">SAFE</span>
+        <span>${up}${dn}<button class="btn x" onclick="S.events.splice(${i},1);renderAll()">✕</button></span></div>
+      <div class="row">
+        <div class="field" style="flex:1.6"><label>Name</label><input value="${esc(e.name)}" onchange="S.events[${i}].name=this.value;update()"></div>
+        <div class="field"><label>Amount ($k)</label><input type="number" value="${e.amount/1000}" onchange="S.events[${i}].amount=+this.value*1000;update()"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Valuation cap ($M)</label><input type="number" value="${e.cap/1e6}" onchange="S.events[${i}].cap=+this.value*1e6;update()"></div>
+        <div class="field"><label>Cap type</label><select onchange="S.events[${i}].capType=this.value;update()">
+          <option value="post" ${e.capType==='post'?'selected':''}>Post-money (YC)</option>
+          <option value="pre" ${e.capType==='pre'?'selected':''}>Pre-money</option></select></div>
+        <div class="field"><label>Discount %</label><input type="number" min="0" max="50" value="${e.discount}" onchange="S.events[${i}].discount=+this.value;update()"></div>
+      </div>
+    </div>`;
+    return `
+    <div class="ev">
+      <div class="ev-head"><span class="tag" style="color:var(--accent2);border-color:var(--accent2)">Priced round</span>
+        <span>${up}${dn}<button class="btn x" onclick="S.events.splice(${i},1);renderAll()">✕</button></span></div>
+      <div class="row">
+        <div class="field" style="flex:1.6"><label>Name</label><input value="${esc(e.name)}" onchange="S.events[${i}].name=this.value;update()"></div>
+        <div class="field"><label>Raise ($M)</label><input type="number" step="0.5" value="${e.amount/1e6}" onchange="S.events[${i}].amount=+this.value*1e6;update()"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Pre-money ($M)</label><input type="number" step="0.5" value="${e.preMoney/1e6}" onchange="S.events[${i}].preMoney=+this.value*1e6;update()"></div>
+        <div class="field"><label>Pool after round %</label><input type="number" min="0" max="40" value="${e.poolPct}" onchange="S.events[${i}].poolPct=+this.value;update()"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function swapEv(a,b){const t=S.events[a];S.events[a]=S.events[b];S.events[b]=t;renderAll();}
+function addFounder(){S.founders.push({name:'Founder '+(S.founders.length+1),pct:10});renderAll();}
+function addSafe(){S.events.push({type:'safe',name:'SAFE',amount:500000,cap:10000000,capType:'post',discount:0});renderAll();}
+function addPriced(){S.events.push({type:'priced',name:'Round',amount:5000000,preMoney:20000000,poolPct:10});renderAll();}
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+$('earlyPool').addEventListener('change',e=>{S.earlyPoolPct=+e.target.value;update();});
+$('exitVal').addEventListener('change',e=>{S.exitValue=+e.target.value*1e6;update();});
+$('prefs').addEventListener('change',e=>{S.prefsEnabled=e.target.value==='1';update();});
+
+/* ===================== RENDER RESULTS ===================== */
+const PALETTE={founder:['#5eead4','#818cf8','#f472b6','#fb923c','#a3e635'],pool:'#64748b',investor:['#fbbf24','#f87171','#a78bfa','#38bdf8','#facc15','#fb7185','#c084fc']};
+function colorFor(h,counts){
+  if(h.kind==='pool') return PALETTE.pool;
+  if(h.kind==='founder') return PALETTE.founder[counts.f++ % PALETTE.founder.length];
+  return PALETTE.investor[counts.i++ % PALETTE.investor.length];
+}
+function update(){
+  $('exitVal').value = S.exitValue/1e6;
+  $('prefs').value = S.prefsEnabled?'1':'0';
+  const r = simulate(S);
+  // colors stable per holder id of final stage
+  const counts={f:0,i:0}; const colors={};
+  r.holders.forEach(h=>{colors[h.label]=colorFor(h,counts);});
+  // warnings
+  $('warnings').innerHTML = r.warnings.map(w=>`<div class="warnbox">⚠ ${w}</div>`).join('');
+  // hero stats
+  const you = r.exit.rows.find(x=>x.kind==='founder');
+  const founderRows = r.exit.rows.filter(x=>x.kind==='founder');
+  const final = r.stages[r.stages.length-1];
+  const totRaised = S.events.reduce((s,e)=>s+(e.amount||0),0);
+  $('hero').innerHTML = founderRows.map(f=>`
+    <div class="stat hl"><div class="v">${fmt$(f.payout)}</div><div class="l">${esc(f.label)} take-home at ${fmt$(r.exit.exitValue)} exit</div></div>`).join('')
+    + `<div class="stat"><div class="v">${fmtP(founderRows.reduce((s,f)=>s+f.pct,0))}</div><div class="l">founders' combined final ownership</div></div>
+       <div class="stat"><div class="v">${fmt$(totRaised)}</div><div class="l">total capital raised</div></div>`;
+  drawChart(r,colors);
+  // waterfall
+  $('waterfall').innerHTML = `<tr><th>Holder</th><th class="r">Ownership</th><th class="r">Invested</th><th class="r">Payout</th><th class="r">Multiple</th></tr>`+
+    r.exit.rows.slice().sort((a,b)=>b.payout-a.payout).map(x=>`
+    <tr><td><span class="dot" style="background:${colors[x.label]||'#888'}"></span>${esc(x.label)}${x.tookPref?'<span class="pref">took 1x pref</span>':''}</td>
+    <td class="r">${fmtP(x.pct)}</td><td class="r">${x.invested?fmt$(x.invested):'—'}</td>
+    <td class="r"><strong>${fmt$(x.payout)}</strong></td>
+    <td class="r">${x.invested?(x.payout/x.invested).toFixed(1)+'×':'—'}</td></tr>`).join('');
+  // cap table
+  $('captable').innerHTML = `<tr><th>Holder</th>${r.stages.map(s=>`<th class="r">${esc(s.name)}</th>`).join('')}</tr>`+
+    final.holders.filter(h=>h.pct>1e-9).map(h=>`
+    <tr><td><span class="dot" style="background:${colors[h.label]||'#888'}"></span>${esc(h.label)}</td>
+    ${r.stages.map(st=>{const m=st.holders.find(x=>x.label===h.label);return `<td class="r">${m&&m.pct>1e-9?fmtP(m.pct):'—'}</td>`;}).join('')}</tr>`).join('');
+}
+function drawChart(r,colors){
+  const stages=r.stages, W=640,H=300,padL=10,padR=10,padT=14,padB=34;
+  const n=stages.length, bw=Math.min(86,(W-padL-padR)/n*0.62), gap=(W-padL-padR)/n;
+  let sv=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Ownership by stage">`;
+  stages.forEach((st,si)=>{
+    let y=padT; const x=padL+gap*si+(gap-bw)/2;
+    const hTot=H-padT-padB;
+    st.holders.filter(h=>h.pct>1e-9).forEach(h=>{
+      const hh=h.pct*hTot;
+      sv+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(hh-1,0.5)}" rx="2" fill="${colors[h.label]||'#888'}" opacity="${h.kind==='founder'?1:.82}"><title>${esc(st.name)} — ${esc(h.label)}: ${fmtP(h.pct)}</title></rect>`;
+      if(hh>15) sv+=`<text x="${x+bw/2}" y="${y+hh/2+4}" font-size="10.5" fill="#0b0e14" text-anchor="middle" font-weight="600">${fmtP(h.pct)}</text>`;
+      y+=hh;
+    });
+    sv+=`<text x="${x+bw/2}" y="${H-12}" font-size="11" fill="#8b94a7" text-anchor="middle">${esc(st.name.length>12?st.name.slice(0,11)+'…':st.name)}</text>`;
+  });
+  sv+='</svg>';
+  $('chart').innerHTML=sv;
+  const final=stages[stages.length-1];
+  $('legend').innerHTML=final.holders.filter(h=>h.pct>1e-9).map(h=>`<span style="margin-right:14px;white-space:nowrap"><span class="dot" style="background:${colors[h.label]}"></span>${esc(h.label)}</span>`).join('');
+}
+function renderAll(){renderFounders();renderEvents();update();}
+renderAll();
+</script>
+</body>
+</html>
