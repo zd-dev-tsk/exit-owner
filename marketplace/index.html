@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Market — discover, trust and install AI agents</title>
+<meta name="description" content="Prototype AI agents marketplace: searchable registry of agent manifests with trust scores, permission-risk badges and transparent pricing. No backend, runs in your browser.">
+<style>
+:root{
+  --bg:#0b0e14; --panel:#12161f; --panel2:#171c27; --line:#232a38;
+  --text:#e8ecf4; --muted:#8b94a7; --accent:#5eead4; --accent2:#818cf8;
+  --warn:#fbbf24; --danger:#f87171; --good:#34d399;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,'Segoe UI',Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+header{padding:42px 0 10px}
+h1{font-size:34px;letter-spacing:-.02em;line-height:1.15}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);margin-top:10px;max-width:680px;font-size:16px}
+.toolbar{display:flex;gap:10px;margin:24px 0 18px;flex-wrap:wrap}
+input,select,button,textarea{font:inherit;color:var(--text)}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent2)}
+#q{flex:2;min-width:220px}
+.toolbar select{flex:1;min-width:140px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:40px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;transition:.15s}
+.card:hover{border-color:var(--accent2)}
+.card h3{font-size:16px;letter-spacing:-.01em}
+.pub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.vrf{color:var(--accent);font-size:11px;border:1px solid rgba(94,234,212,.4);border-radius:99px;padding:0 7px;margin-left:6px;vertical-align:1px}
+.desc{color:var(--muted);font-size:13.5px;margin:9px 0 12px;min-height:40px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}
+.badge{border:1px solid var(--line);border-radius:99px;padding:2px 9px;color:var(--muted)}
+.badge.trust-hi{color:var(--good);border-color:rgba(52,211,153,.45)}
+.badge.trust-mid{color:var(--warn);border-color:rgba(251,191,36,.45)}
+.badge.trust-lo{color:var(--danger);border-color:rgba(248,113,113,.45)}
+.badge.risk-low{color:var(--good);border-color:rgba(52,211,153,.45)}
+.badge.risk-medium{color:var(--warn);border-color:rgba(251,191,36,.45)}
+.badge.risk-high{color:var(--danger);border-color:rgba(248,113,113,.45)}
+.price{margin-left:auto;font-weight:600;font-size:13px;color:var(--text)}
+.empty{color:var(--muted);padding:30px 0;text-align:center}
+/* detail overlay */
+#ovl{position:fixed;inset:0;background:rgba(4,6,10,.7);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:10}
+#ovl.on{display:flex}
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:16px;max-width:680px;width:100%;padding:24px}
+.detail h2{font-size:22px;letter-spacing:-.01em}
+.detail h4{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:18px 0 8px}
+.perm{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 2px;font-size:13.5px}
+.caps li{margin:4px 0 4px 18px;font-size:14px;color:var(--text)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13.5px;transition:.15s}
+.btn:hover{border-color:var(--accent2);color:#fff}
+.btn.primary{background:var(--accent);color:#042f2e;font-weight:600;border:none}
+.row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12px;overflow:auto;max-height:260px}
+/* publish */
+.pubsec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:50px}
+.pubsec h2{font-size:20px;margin-bottom:6px}
+.pubsec p{color:var(--muted);font-size:14px;margin-bottom:12px}
+#manifest{width:100%;min-height:180px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.errs{color:var(--danger);font-size:13.5px;margin-top:10px}
+.ok{color:var(--good);font-size:13.5px;margin-top:10px}
+footer{border-top:1px solid var(--line);padding:26px 0 50px;color:var(--muted);font-size:13.5px}
+footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Find an agent you can <em>actually trust</em>.</h1>
+  <p class="sub">Prototype AI agents marketplace. Every listing is a signed manifest: declared permissions with risk badges, Bayesian-smoothed trust scores, and transparent pricing — no engagement-bait ranking. Nothing leaves your browser.</p>
+</header>
+
+<div class="toolbar">
+  <input id="q" type="search" placeholder="Search agents — try “review pull requests”…">
+  <select id="cat"><option value="">All categories</option></select>
+  <select id="price"><option value="">Any pricing</option><option value="free">Free</option><option value="per_call">Per call</option><option value="subscription">Subscription</option><option value="revshare">Revenue share</option></select>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<div class="pubsec">
+  <h2>Publish an agent</h2>
+  <p>Paste a manifest to validate it and preview its trust score. In production this is the publisher CLI → automated scan → review pipeline (see <a href="DESIGN.md" style="color:var(--accent)">DESIGN.md</a>).</p>
+  <textarea id="manifest" spellcheck="false"></textarea>
+  <div class="row"><button class="btn primary" onclick="checkManifest()">Validate manifest</button><span id="pubout"></span></div>
+</div>
+</div>
+
+<div id="ovl" onclick="if(event.target===this)closeDetail()"><div class="detail" id="detail"></div></div>
+
+<div class="wrap"><footer>
+  Prototype — client-side only. Mechanics (trust scoring, ranking, settlement) live in <code>engine.js</code> and are unit-tested via <code>node test.js</code>. Design rationale in <code>DESIGN.md</code>.
+</footer></div>
+
+<script src="engine.js"></script>
+<script src="registry.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const NOW = new Date().toISOString().slice(0, 10);
+const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+
+function priceLabel(p) {
+  if (p.model === 'free') return 'Free';
+  if (p.model === 'per_call') return '$' + p.pricePerCall + ' / call';
+  if (p.model === 'subscription') return '$' + p.monthly + ' / mo';
+  return p.sharePct + '% rev share';
+}
+function trustClass(t) { return t >= 70 ? 'trust-hi' : t >= 45 ? 'trust-mid' : 'trust-lo'; }
+
+// populate category filter from data
+[...new Set(REGISTRY.map(a => a.category))].sort().forEach(c => {
+  const o = document.createElement('option'); o.value = c; o.textContent = c; $('cat').appendChild(o);
+});
+
+function render() {
+  const ranked = rankAgents(REGISTRY, { query: $('q').value, category: $('cat').value, pricing: $('price').value, now: NOW });
+  $('cards').innerHTML = ranked.length ? ranked.map(({ agent: a, trust }) => {
+    const risk = overallRisk(a.permissions);
+    const r = a.stats.ratings;
+    return `<div class="card" onclick="openDetail('${a.id}')">
+      <h3>${a.name}</h3>
+      <div class="pub">${a.publisher.name}${a.publisher.verified ? '<span class="vrf">verified</span>' : ''}</div>
+      <div class="desc">${a.description}</div>
+      <div class="meta">
+        <span class="badge ${trustClass(trust)}">trust ${Math.round(trust)}</span>
+        <span class="badge risk-${risk}">${risk} risk</span>
+        <span class="badge">★ ${r.avg} (${fmt(r.count)})</span>
+        <span class="badge">${fmt(a.stats.installs)} installs</span>
+        <span class="price">${priceLabel(a.pricing)}</span>
+      </div></div>`;
+  }).join('') : '<div class="empty">No agents match — try a broader query.</div>';
+}
+
+function openDetail(id) {
+  const a = REGISTRY.find(x => x.id === id);
+  const trust = trustScore(a, NOW);
+  const est = estimateMonthlyCost(a, 1000);
+  $('detail').innerHTML = `
+    <h2>${a.name} <span class="pub" style="font-size:13px">v${a.version} · ${a.publisher.name}${a.publisher.verified ? '<span class="vrf">verified</span>' : ''}</span></h2>
+    <div class="desc" style="min-height:0">${a.description}</div>
+    <div class="meta">
+      <span class="badge ${trustClass(trust)}">trust ${Math.round(trust)}</span>
+      <span class="badge risk-${overallRisk(a.permissions)}">${overallRisk(a.permissions)} risk</span>
+      <span class="badge">${a.security && a.security.sandboxed ? 'sandboxed' : 'NOT sandboxed'}</span>
+      <span class="badge">${a.security && a.security.scanPassed ? 'scan passed' : 'no security scan'}</span>
+      <span class="badge">model: ${a.model}</span>
+    </div>
+    <h4>Capabilities</h4><ul class="caps">${a.capabilities.map(c => `<li>${c}</li>`).join('')}</ul>
+    <h4>Permissions requested</h4>
+    ${a.permissions.length ? a.permissions.map(p => `<div class="perm"><span>${p}</span><span class="badge risk-${permissionRisk(p)}">${permissionRisk(p)}</span></div>`).join('') : '<div class="pub">None — this agent has no external access.</div>'}
+    <h4>Pricing</h4>
+    <div style="font-size:14px">${priceLabel(a.pricing)}${est !== null && a.pricing.model !== 'free' ? ` · est. <strong>$${est.toLocaleString()}</strong>/mo at 1,000 calls` : ''}${est === null ? ' · cost scales with closed revenue, not calls' : ''}</div>
+    <h4>Manifest</h4><pre>${JSON.stringify(a, null, 2)}</pre>
+    <div class="row"><button class="btn primary" onclick="alert('Prototype — install would grant exactly the permissions listed above.')">Install (grants ${a.permissions.length} scope${a.permissions.length === 1 ? '' : 's'})</button><button class="btn" onclick="closeDetail()">Close</button></div>`;
+  $('ovl').classList.add('on');
+}
+function closeDetail() { $('ovl').classList.remove('on'); }
+
+function checkManifest() {
+  let m;
+  try { m = JSON.parse($('manifest').value); }
+  catch (e) { $('pubout').innerHTML = `<span class="errs">Not valid JSON: ${e.message}</span>`; return; }
+  const v = validateManifest(m);
+  $('pubout').innerHTML = v.ok
+    ? `<span class="ok">Valid ✓ — projected trust score at listing: <strong>${Math.round(trustScore(m, NOW))}</strong> (grows with ratings)</span>`
+    : `<span class="errs">${v.errors.join(' · ')}</span>`;
+}
+$('manifest').value = JSON.stringify({
+  id: 'my-agent', name: 'My Agent', version: '1.0.0',
+  publisher: { name: 'You', verified: false },
+  description: 'One sentence on what this agent does for whom.',
+  category: 'productivity', tags: ['example'],
+  capabilities: ['do the thing'], model: 'claude-sonnet-5',
+  permissions: ['net:fetch'],
+  pricing: { model: 'per_call', pricePerCall: 0.02 },
+  security: { sandboxed: true, scanPassed: false },
+}, null, 2);
+
+['q', 'cat', 'price'].forEach(id => $(id).addEventListener('input', render));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+render();
+</script>
+</body>
+</html>
